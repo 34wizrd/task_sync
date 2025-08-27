@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "757881018521",
+    "project_id": "mobile-app102",
+    "storage_bucket": "mobile-app102.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:757881018521:android:efdb989f49e98d41594008",
+        "android_client_info": {
+          "package_name": "com.git34wizrd.tasksync"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-YfxOr0Kyt7__N_JI5-heWslMsTPeTHw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
