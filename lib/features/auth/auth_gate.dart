@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../diary/diary_screen.dart';
-import 'login_screen.dart';
+import 'login/login_screen.dart';
 
 
 class AuthGate extends StatelessWidget {
