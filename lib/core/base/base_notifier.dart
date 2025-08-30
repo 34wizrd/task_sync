@@ -1,7 +1,5 @@
 import 'package:flutter/foundation.dart';
 
-/// Centralized loading + error handling for all notifiers.
-/// Call `await guard(() async { ... });` around async work.
 abstract class BaseNotifier extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
@@ -10,19 +8,11 @@ abstract class BaseNotifier extends ChangeNotifier {
   String? get error => _error;
 
   @protected
-  void setLoading(bool value) {
-    if (_isLoading == value) return;
-    _isLoading = value;
-    notifyListeners();
-  }
+  void setLoading(bool v) { if (_isLoading == v) return; _isLoading = v; notifyListeners(); }
 
   @protected
-  void setError(String? message) {
-    _error = message;
-    notifyListeners();
-  }
+  void setError(String? m) { _error = m; notifyListeners(); }
 
-  /// Wraps an async op with loading+error. Returns result or null on error.
   @protected
   Future<T?> guard<T>(Future<T> Function() op) async {
     setError(null);
@@ -38,7 +28,6 @@ abstract class BaseNotifier extends ChangeNotifier {
     }
   }
 
-  /// Override to send errors to Crashlytics/Sentry if you like.
   @protected
   void onError(Object error, StackTrace stackTrace) {}
 }

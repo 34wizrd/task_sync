@@ -1,114 +1,62 @@
-import 'dart:convert';
-import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:uuid/uuid.dart';
-
+import '../../core/base/base_notifier.dart';
 import '../../core/models/food_item_model.dart';
 import '../../core/models/meal_entry_model.dart';
-import '../../core/services/db_service.dart';
+import '../../core/network/sync_notifier.dart';
+import '../food/food_service.dart';
+import 'diary_service.dart';
 
-class DiaryNotifier extends ChangeNotifier {
-  final DbService _dbService = DbService();
-  final Uuid _uuid = Uuid();
+/// Manages the state for the daily diary screen.
+class DiaryNotifier extends BaseNotifier {
+  DiaryNotifier({
+    required DiaryService diaryService,
+    required SyncNotifier syncNotifier,
+  })  : _diaryService = diaryService,
+        _syncNotifier = syncNotifier;
 
-  List<MealEntry> todaysEntries = [];
-  int get totalCalories => todaysEntries.fold(0, (sum, item) => sum + item.calories);
+  final DiaryService _diaryService;
+  final SyncNotifier _syncNotifier;
 
+  List<MealEntry> _todaysEntries = [];
+  List<MealEntry> get todaysEntries => _todaysEntries;
+
+  /// A computed property to get the total calories for the day.
+  int get totalCalories {
+    return _todaysEntries.fold(0, (sum, entry) => sum + entry.calories);
+  }
+
+  /// Loads all of today's meal entries from the local database.
   Future<void> loadTodaysEntries() async {
-    final db = await _dbService.database;
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
-    final endOfDay = startOfDay + 86400000 - 1; // 24 hours - 1 millisecond
-
-    final maps = await db.query(
-      'meal_entries',
-      where: 'date >= ? AND date <= ?',
-      whereArgs: [startOfDay, endOfDay],
-    );
-
-    todaysEntries = List.generate(maps.length, (i) => MealEntry.fromMap(maps[i]));
-    notifyListeners();
-  }
-
-  Future<void> addMealEntry(FoodItem foodItem) async {
-    final newEntry = MealEntry(
-      id: _uuid.v4(),
-      foodId: foodItem.id,
-      foodName: foodItem.name,
-      calories: foodItem.calories,
-      date: DateTime.now(),
-      updatedAt: DateTime.now().millisecondsSinceEpoch,
-    );
-
-    final db = await _dbService.database;
-    await db.insert('meal_entries', newEntry.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace);
-
-    await _addToOutbox('CREATE', 'meal_entries', newEntry.toMap());
-    await loadTodaysEntries();
-  }
-
-  Future<void> deleteMealEntry(String entryId) async {
-    final db = await _dbService.database;
-
-    // First, find the entry we are about to delete
-    final List<Map<String, dynamic>> maps = await db.query(
-      'meal_entries',
-      where: 'id = ?',
-      whereArgs: [entryId],
-    );
-
-    if (maps.isNotEmpty) {
-      // Add the delete operation to the outbox BEFORE deleting locally
-      await _addToOutbox('DELETE', 'meal_entries', maps.first);
-    }
-
-    // Now, delete the entry from the local database
-    await db.delete(
-      'meal_entries',
-      where: 'id = ?',
-      whereArgs: [entryId],
-    );
-
-    // Refresh the UI by reloading the entries and notifying listeners
-    await loadTodaysEntries();
-  }
-
-  Future<void> updateMealEntry(MealEntry entry) async {
-    final db = await _dbService.database;
-
-    // Create an updated entry with a new timestamp
-    final updatedEntry = MealEntry(
-      id: entry.id,
-      foodId: entry.foodId,
-      foodName: entry.foodName,
-      calories: entry.calories, // In a real app, this might be a new value
-      date: entry.date,
-      updatedAt: DateTime.now().millisecondsSinceEpoch, // Crucial: update the timestamp
-    );
-
-    // Update the record in the local database
-    await db.update(
-      'meal_entries',
-      updatedEntry.toMap(),
-      where: 'id = ?',
-      whereArgs: [updatedEntry.id],
-    );
-
-    // Add the update operation to the outbox
-    await _addToOutbox('UPDATE', 'meal_entries', updatedEntry.toMap());
-
-    // Refresh the UI
-    await loadTodaysEntries();
-  }
-
-  Future<void> _addToOutbox(String operation, String table, Map<String, dynamic> data) async {
-    final db = await _dbService.database;
-    await db.insert('outbox', {
-      'operation': operation,
-      'tableName': table,
-      'data': jsonEncode(data),
-      'createdAt': DateTime.now().millisecondsSinceEpoch,
+    await guard(() async {
+      _todaysEntries = await _diaryService.getTodaysEntries();
     });
+    // No need to update pending count here, as loading doesn't create new pending items.
+  }
+
+  /// Adds a new meal entry based on a selected food item.
+  Future<void> addMealEntry(FoodItem foodItem) async {
+    await guard(() async {
+      await _diaryService.addMealEntry(foodItem);
+      // Refresh the list from the source of truth to show the new entry.
+      _todaysEntries = await _diaryService.getTodaysEntries();
+    });
+    await _updatePendingCount();
+  }
+
+  /// Deletes a meal entry.
+  Future<void> deleteMealEntry(String id) async {
+    await guard(() async {
+      await _diaryService.deleteMealEntry(id);
+      _todaysEntries.removeWhere((entry) => entry.id == id);
+    });
+    await _updatePendingCount();
+  }
+
+  /// A helper to update the pending sync count in the UI.
+  Future<void> _updatePendingCount() async {
+    // In a larger app, you might get this from a shared service.
+    // For now, we assume FoodService can count the whole outbox.
+    final foodService = FoodService(); // A bit of a shortcut here
+    final count = await foodService.getPendingOutboxCount();
+    _syncNotifier.setPending(count);
   }
 }

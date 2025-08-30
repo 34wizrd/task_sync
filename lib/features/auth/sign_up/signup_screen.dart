@@ -265,22 +265,51 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                       onPressed: vm.isLoading
                                           ? null
                                           : () async {
+                                        // validate first (no async use of context yet)
                                         final valid = _formKey.currentState?.validate() == true;
                                         if (!valid) return;
 
                                         if (!vm.acceptedTerms) {
+                                          // using context before any await is fine
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             const SnackBar(content: Text('Please accept the Terms & Privacy')),
                                           );
                                           return;
                                         }
 
+                                        // 1) async work (may outlive this widget)
                                         await vm.signUp(
                                           email: _emailController.text.trim(),
                                           password: _passwordController.text,
                                         );
 
-                                        if (vm.error == null && mounted) {
+                                        // 2) stand-alone mounted check right after the await
+                                        if (!mounted) return;
+
+                                        if (vm.error == null) {
+                                          final to = vm.emailSentTo ?? _emailController.text.trim();
+
+                                          // 3) we will await showDialog -> check again afterwards
+                                          await showDialog<void>(
+                                            context: context,
+                                            builder: (_) => AlertDialog(
+                                              title: const Text('Verify your email'),
+                                              content: Text(
+                                                'We’ve sent a verification link to:\n$to\n\nPlease verify, then log in.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.of(context).pop(),
+                                                  child: const Text('OK'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+
+                                          // 4) another standalone check after awaiting showDialog
+                                          if (!mounted) return;
+
+                                          // navigate (e.g., back to login)
                                           Navigator.maybePop(context);
                                         }
                                       },

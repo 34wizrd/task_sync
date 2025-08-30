@@ -1,33 +1,19 @@
-import 'package:flutter/foundation.dart';
-
-@immutable
 class MealEntry {
   final String id;
-  final String foodId; // Foreign key to FoodItem
+  final String foodId;
   final String foodName;
   final int calories;
-  final DateTime date; // The date this was eaten
+  final int createdAt;
   final int updatedAt;
 
-  const MealEntry({
+  MealEntry({
     required this.id,
     required this.foodId,
     required this.foodName,
     required this.calories,
-    required this.date,
+    required this.createdAt,
     required this.updatedAt,
   });
-
-  factory MealEntry.fromMap(Map<String, dynamic> map) {
-    return MealEntry(
-      id: map['id'] as String,
-      foodId: map['foodId'] as String,
-      foodName: map['foodName'] as String,
-      calories: map['calories'] as int,
-      date: DateTime.fromMillisecondsSinceEpoch(map['date'] as int),
-      updatedAt: map['updatedAt'] as int,
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -35,8 +21,19 @@ class MealEntry {
       'foodId': foodId,
       'foodName': foodName,
       'calories': calories,
-      'date': date.millisecondsSinceEpoch,
+      'createdAt': createdAt,
       'updatedAt': updatedAt,
     };
+  }
+
+  factory MealEntry.fromMap(Map<String, dynamic> map) {
+    return MealEntry(
+      id: map['id'] ?? '',
+      foodId: map['foodId'] ?? '',
+      foodName: map['foodName'] ?? '',
+      calories: map['calories']?.toInt() ?? 0,
+      createdAt: map['createdAt']?.toInt() ?? 0,
+      updatedAt: map['updatedAt']?.toInt() ?? 0,
+    );
   }
 }

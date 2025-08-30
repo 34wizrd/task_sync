@@ -1,10 +1,10 @@
-import 'dart:async';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/services/sync_service.dart';
+import '../../../widgets/main_layout.dart'; // Using the enhanced MainLayout
+import '../../core/models/food_item_model.dart';
+import '../../core/models/meal_entry_model.dart';
+import '../../core/network/sync_notifier.dart';
 import '../food/food_notifier.dart';
 import '../food/food_screen.dart';
 import 'diary_notifier.dart';
@@ -13,191 +13,345 @@ class DailyScreen extends StatefulWidget {
   const DailyScreen({super.key});
 
   @override
-  _DailyScreenState createState() => _DailyScreenState();
+  State<DailyScreen> createState() => _DailyScreenState();
 }
 
 class _DailyScreenState extends State<DailyScreen> {
-  final SyncService _syncService = SyncService();
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  // A hardcoded goal for the UI. In a real app, this would come from user settings.
+  static const double _calorieGoal = 2200;
 
   @override
   void initState() {
     super.initState();
-
-    // Load initial data from the local database when the widget is first built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<DiaryNotifier>(context, listen: false).loadTodaysEntries();
-      Provider.of<FoodNotifier>(context, listen: false).loadFoodItems();
+      _loadData();
     });
-
-    // Start listening for connection changes to trigger auto-sync
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-          final isConnected = results.any((result) => result != ConnectivityResult.none);
-
-          if (isConnected) {
-            print("Regained connection, triggering automatic sync...");
-            _handleSync();
-          } else {
-            print("Lost connection.");
-          }
-        });
   }
 
-  @override
-  void dispose() {
-    // Clean up the connectivity listener when the widget is removed
-    _connectivitySubscription?.cancel();
-    super.dispose();
+  Future<void> _loadData() async {
+    // We can load in parallel for better performance.
+    await Future.wait([
+      context.read<DiaryNotifier>().loadTodaysEntries(),
+      context.read<FoodNotifier>().loadFoodItems(),
+    ]);
   }
 
-  /// Handles the synchronization process and provides user feedback.
   Future<void> _handleSync() async {
-    // Show a temporary message to the user
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Syncing with cloud...')),
-    );
+    final syncNotifier = context.read<SyncNotifier>();
+    final messenger = ScaffoldMessenger.of(context);
 
-    await _syncService.sync();
+    await syncNotifier.sync();
 
-    // Hide the previous message and show a completion message
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Sync complete!')),
-    );
+    if (!mounted) return;
 
-    // Refresh the UI with any potential data pulled from the server
-    await Provider.of<FoodNotifier>(context, listen: false).loadFoodItems();
-    await Provider.of<DiaryNotifier>(context, listen: false).loadTodaysEntries();
+    messenger.removeCurrentSnackBar();
+    if (syncNotifier.error != null) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: ${syncNotifier.error}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Sync complete!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      _loadData();
+    }
+  }
+
+  void _showAddMealDialog() {
+    final foodItems = context.read<FoodNotifier>().foodItems;
+    if (foodItems.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text("No Food in Library"),
+          content: const Text("Please add items to your food library first."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("OK"),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (_) => _AddMealDialog(foodItems: foodItems),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Today's Diary"),
-        actions: [
-          // Manual sync button, can be removed if auto-sync is sufficient
-          IconButton(
-            icon: Icon(Icons.sync),
-            onPressed: _handleSync,
-            tooltip: 'Sync with Cloud',
-          ),
-          // Button to navigate to the food library management screen
-          IconButton(
-            icon: Icon(Icons.library_books),
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => FoodScreen())),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Summary Header showing total calories
-          Consumer<DiaryNotifier>(
-            builder: (context, diary, child) => Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Center(
-                    child: Text(
-                      "Total: ${diary.totalCalories} kcal",
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          // Logged Meal Items List
-          Expanded(
-            child: Consumer<DiaryNotifier>(
-              builder: (context, diary, child) {
-                if (diary.todaysEntries.isEmpty) {
-                  return Center(child: Text("No meals logged today."));
-                }
-                return ListView.builder(
-                  itemCount: diary.todaysEntries.length,
-                  itemBuilder: (context, index) {
-                    final entry = diary.todaysEntries[index];
-                    return Dismissible(
-                      key: Key(entry.id),
-                      onDismissed: (direction) {
-                        Provider.of<DiaryNotifier>(context, listen: false)
-                            .deleteMealEntry(entry.id);
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text("${entry.foodName} removed")),
-                        );
-                      },
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: EdgeInsets.symmetric(horizontal: 20.0),
-                        child: Icon(Icons.delete, color: Colors.white),
-                      ),
-                      child: ListTile(
-                        title: Text(entry.foodName),
-                        trailing: Text("${entry.calories} kcal"),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddMealDialog(context),
-        child: Icon(Icons.add),
+    // The entire screen is now built on top of MainLayout.
+    return MainLayout(
+      title: "Today's Diary",
+      fab: FloatingActionButton(
+        onPressed: _showAddMealDialog,
+        child: const Icon(Icons.add),
         tooltip: 'Add Meal',
+      ),
+      // The body is delegated to a separate widget.
+      child: _DailyScreenBody(
+        onRefresh: _loadData,
+        onSync: _handleSync,
+        calorieGoal: _calorieGoal,
       ),
     );
   }
+}
 
-  /// Shows a dialog to select a food item from the library to log as a meal.
-  void _showAddMealDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        final foodItems =
-            Provider.of<FoodNotifier>(context, listen: false).foodItems;
-        if (foodItems.isEmpty) {
-          return AlertDialog(
-            title: Text("No Food in Library"),
-            content: Text("Please add items to your food library first."),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text("OK"))
-            ],
-          );
-        }
-        return SimpleDialog(
-          title: Text("Add Meal"),
-          children: foodItems
-              .map((foodItem) => SimpleDialogOption(
-            onPressed: () {
-              Provider.of<DiaryNotifier>(context, listen: false)
-                  .addMealEntry(foodItem);
-              Navigator.pop(dialogContext);
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(foodItem.name),
-                  Text("${foodItem.calories} kcal"),
-                ],
+/// The main content body for the DailyScreen.
+class _DailyScreenBody extends StatelessWidget {
+  const _DailyScreenBody({
+    required this.onRefresh,
+    required this.onSync,
+    required this.calorieGoal,
+  });
+
+  final Future<void> Function() onRefresh;
+  final Future<void> Function() onSync;
+  final double calorieGoal;
+
+  @override
+  Widget build(BuildContext context) {
+    final diary = context.watch<DiaryNotifier>();
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 220.0,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            flexibleSpace: FlexibleSpaceBar(
+              background: _CalorieSummaryHeader(
+                totalCalories: diary.totalCalories,
+                goal: calorieGoal,
               ),
             ),
-          ))
-              .toList(),
-        );
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.sync),
+                onPressed: onSync,
+                tooltip: 'Sync with Cloud',
+              ),
+              IconButton(
+                icon: const Icon(Icons.library_books_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FoodScreen()),
+                ),
+                tooltip: 'Food Library',
+              ),
+            ],
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: Text("Today's Meals",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          _DiaryEntryList(entries: diary.todaysEntries),
+        ],
+      ),
+    );
+  }
+}
+
+/// A beautiful header that visualizes the daily calorie intake.
+class _CalorieSummaryHeader extends StatelessWidget {
+  const _CalorieSummaryHeader({required this.totalCalories, required this.goal});
+
+  final int totalCalories;
+  final double goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final progress = (goal == 0) ? 0.0 : (totalCalories / goal).clamp(0.0, 1.0);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: theme.colorScheme.primaryContainer.withOpacity(0.5),
+      margin: const EdgeInsets.all(16),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 10,
+                backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+              ),
+            ),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$totalCalories',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                Text(
+                  'kcal / ${goal.toInt()}',
+                  style: theme.textTheme.bodyLarge,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Displays the list of meals or an empty state message.
+class _DiaryEntryList extends StatelessWidget {
+  const _DiaryEntryList({required this.entries});
+  final List<MealEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return const SliverToBoxAdapter(child: _EmptyDiaryState());
+    }
+
+    return SliverList.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        return _MealListItem(entry: entries[index]);
       },
+    );
+  }
+}
+
+/// A card-based list item for a single meal entry.
+class _MealListItem extends StatelessWidget {
+  const _MealListItem({required this.entry});
+  final MealEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Dismissible(
+          key: Key(entry.id),
+          direction: DismissDirection.endToStart,
+          onDismissed: (_) {
+            context.read<DiaryNotifier>().deleteMealEntry(entry.id);
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(content: Text("${entry.foodName} removed")),
+              );
+          },
+          background: Container(
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              child: Icon(Icons.restaurant_menu),
+            ),
+            title: Text(entry.foodName, style: TextStyle(fontWeight: FontWeight.bold)),
+            trailing: Text(
+              "${entry.calories} kcal",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A more engaging empty state for the diary.
+class _EmptyDiaryState extends StatelessWidget {
+  const _EmptyDiaryState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 64),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.menu_book, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(
+            'Your diary is empty',
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tap the + button to log your first meal of the day.',
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A self-contained dialog for selecting a meal to add.
+class _AddMealDialog extends StatelessWidget {
+  const _AddMealDialog({required this.foodItems});
+  final List<FoodItem> foodItems;
+
+  @override
+  Widget build(BuildContext context) {
+    return SimpleDialog(
+      title: const Text("Select a Meal"),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      children: foodItems.map((foodItem) {
+        return SimpleDialogOption(
+          onPressed: () {
+            context.read<DiaryNotifier>().addMealEntry(foodItem);
+            Navigator.pop(context);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: Row(
+              children: [
+                Icon(Icons.fastfood_outlined, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 16),
+                Expanded(child: Text(foodItem.name)),
+                Text("${foodItem.calories} kcal", style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

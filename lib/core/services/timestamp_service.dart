@@ -1,20 +1,36 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
+import 'db_service.dart';
+
+/// A service dedicated to managing the last sync timestamp.
 class TimestampService {
-  static const String _lastSyncKey = 'lastSyncTimestamp';
+  // --- SINGLETON SETUP ---
+  TimestampService._privateConstructor();
+  static final TimestampService instance = TimestampService._privateConstructor();
+  // --- END SINGLETON SETUP ---
 
-  /// Fetches the last sync timestamp from local storage.
-  /// Returns 0 if no timestamp is found (for the very first sync).
+  // CORRECTED: Use the singleton instance.
+  final DbService _dbService = DbService.instance;
+
+  /// Gets the last sync timestamp from the database. Returns 0 if none exists.
   Future<int> getLastSyncTimestamp() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getInt(_lastSyncKey) ?? 0;
+    final db = await _dbService.database;
+    final res = await db.query('sync_timestamps', limit: 1);
+    if (res.isNotEmpty) {
+      return res.first['lastSync'] as int;
+    }
+    return 0; // Default to 0 if no timestamp has been saved yet
   }
 
-  /// Saves the current time as the new last sync timestamp.
+  /// Updates the last sync timestamp to the current time.
   Future<void> updateLastSyncTimestamp() async {
-    final prefs = await SharedPreferences.getInstance();
+    final db = await _dbService.database;
     final now = DateTime.now().millisecondsSinceEpoch;
-    await prefs.setInt(_lastSyncKey, now);
-    print("Updated last sync timestamp to: $now");
+    // Use `insert` with replace conflict algorithm to either create or update the single row.
+    await db.insert(
+      'sync_timestamps',
+      {'id': 1, 'lastSync': now},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 }
