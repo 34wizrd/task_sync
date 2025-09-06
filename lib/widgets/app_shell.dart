@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/diary/dashboard_screen.dart';
+import '../features/profile/profile_screen.dart';
 import 'main_layout.dart';
 
 class AppShell extends StatefulWidget {
@@ -17,7 +18,7 @@ class _AppShellState extends State<AppShell> {
     DashboardScreen(),
     PlaceholderScreen(title: 'Food Log'),
     PlaceholderScreen(title: 'Progress'),
-    PlaceholderScreen(title: 'Profile'),
+    ProfileScreen(),
   ];
 
   static final List<PreferredSizeWidget?> _appBars = <PreferredSizeWidget?>[
