@@ -81,6 +81,28 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () {},
                     textColor: Colors.redAccent.shade100,
                   ),
+                  _SettingsTile(
+                    title: 'Logout',
+                    hasDivider: false, // Last item in the list
+                    textColor: primaryGreen, // A distinct, primary action color
+                    onTap: () async {
+                      // --- LOGOUT LOGIC GOES HERE ---
+                      // In a real app, you would:
+                      // 1. Sign the user out from Firebase
+                      // await FirebaseAuth.instance.signOut();
+
+                      // 2. Navigate to the LoginScreen and remove all previous
+                      // screens from the navigation stack.
+                      // if (context.mounted) {
+                      //   Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                      //     MaterialPageRoute(builder: (context) => const LoginScreen()),
+                      //     (route) => false,
+                      //   );
+                      // }
+
+                      print("Logout button tapped!");
+                    },
+                  ),
                 ],
               ),
             ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../features/diary/dashboard_screen.dart';
+import '../features/food/food_screen.dart';
 import '../features/profile/profile_screen.dart';
 import 'main_layout.dart';
 
@@ -14,11 +15,13 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
   // --- Define the pages and their corresponding AppBars ---
-  static const List<Widget> _pages = <Widget>[
-    DashboardScreen(),
-    PlaceholderScreen(title: 'Food Log'),
-    PlaceholderScreen(title: 'Progress'),
-    ProfileScreen(),
+  static final List<Widget> _pages = <Widget>[
+    const DashboardScreen(),
+   FoodScreen(
+
+   ),
+    const PlaceholderScreen(title: 'Progress'),
+    const ProfileScreen(),
   ];
 
   static final List<PreferredSizeWidget?> _appBars = <PreferredSizeWidget?>[

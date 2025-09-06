@@ -18,12 +18,12 @@ class FoodService {
   }
 
   Future<FoodItem> addFoodItem(String name, int calories) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now();
     final newFood = FoodItem(
       id: _uuid.v4(),
       name: name.trim(),
       calories: calories,
-      updatedAt: now,
+      updatedAt: now, servingSize: '', imagePath: '',
     );
 
     final db = await _dbService.database;
@@ -34,7 +34,7 @@ class FoodService {
 
   Future<FoodItem> updateFoodItem(FoodItem item) async {
     final db = await _dbService.database;
-    final updatedItem = item.copyWith(updatedAt: DateTime.now().millisecondsSinceEpoch);
+    final updatedItem = item.copyWith(updatedAt: DateTime.now());
 
     await db.update(
       'food_items',

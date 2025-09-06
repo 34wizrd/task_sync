@@ -8,13 +8,17 @@ import 'food_service.dart';
 /// This notifier delegates all data persistence and business logic to the [FoodService]
 /// and focuses solely on managing the UI state, such as the list of food items,
 /// loading status, search queries, and errors.
+///
+
 class FoodNotifier extends BaseNotifier {
   // Dependencies are required and provided via constructor injection.
   FoodNotifier({
     required FoodService foodService,
     required SyncNotifier syncNotifier,
   })  : _foodService = foodService,
-        _syncNotifier = syncNotifier;
+        _syncNotifier = syncNotifier {
+    loadFoods();
+  }
 
   final FoodService _foodService;
   final SyncNotifier _syncNotifier;
@@ -82,5 +86,38 @@ class FoodNotifier extends BaseNotifier {
   Future<void> _updatePendingCount() async {
     final count = await _foodService.getPendingOutboxCount();
     _syncNotifier.setPending(count);
+  }
+
+  List<FoodItem> _recentItems = [];
+  List<FoodItem> _libraryItems = [];
+
+  // --- GETTERS (with built-in filtering) ---
+  List<FoodItem> get recentItems => _searchQuery.isEmpty
+      ? _recentItems
+      : _recentItems.where((f) => f.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+  List<FoodItem> get libraryItems => _searchQuery.isEmpty
+      ? _libraryItems
+      : _libraryItems.where((f) => f.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
+  // --- LOGIC ---
+
+  /// Fetches all food data using the 'guard' method for state management.
+  Future<void> loadFoods() async {
+    await guard(() async {
+      await Future.delayed(const Duration(milliseconds: 800));
+      final now = DateTime.now();
+      _recentItems = [
+        FoodItem(id: 'rec_01', name: 'Chicken Breast', calories: 150, servingSize: '100g', imagePath: 'assets/chicken.png', updatedAt: now),
+        FoodItem(id: 'rec_02', name: 'Brown Rice', calories: 200, servingSize: '1 cup', imagePath: 'assets/rice.png', updatedAt: now),
+      ];
+      _libraryItems = [
+        FoodItem(id: 'lib_01', name: 'Whole Wheat Toast', calories: 120, servingSize: '2 slices', imagePath: 'assets/toast.png', updatedAt: now),
+        FoodItem(id: 'lib_02', name: 'Eggs', calories: 140, servingSize: '2 large', imagePath: 'assets/eggs.png', updatedAt: now),
+        FoodItem(id: 'lib_03', name: 'Oatmeal', calories: 80, servingSize: '1 cup', imagePath: 'assets/oatmeal.png', updatedAt: now),
+        FoodItem(id: 'lib_04', name: 'Apple', calories: 70, servingSize: '1 medium', imagePath: 'assets/apple.png', updatedAt: now),
+        FoodItem(id: 'lib_05', name: 'Almonds', calories: 180, servingSize: '1/4 cup', imagePath: 'assets/almonds.png', updatedAt: now),
+      ];
+    });
   }
 }
