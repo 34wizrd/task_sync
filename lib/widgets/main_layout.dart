@@ -1,37 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../../core/network/connectivity_notifier.dart';
-import '../../core/network/sync_notifier.dart';
+import '../core/network/connectivity_notifier.dart';
+import '../core/network/sync_notifier.dart';
 
 class MainLayout extends StatelessWidget {
   final Widget child;
-  final String? title; // ADDED: To be used in the AppBar
-  final Widget? fab;   // ADDED: For the FloatingActionButton
+  final PreferredSizeWidget? appBar;
+  final Widget? bottomNavigationBar;
 
   const MainLayout({
     super.key,
     required this.child,
-    this.title,
-    this.fab,
+    this.appBar,
+    this.bottomNavigationBar,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Wrap the content in a Scaffold to provide standard app structure.
     return Scaffold(
-      appBar: title != null
-          ? AppBar(
-        title: Text(title!),
-        elevation: 1,
-      )
-          : null,
-      floatingActionButton: fab,
+      appBar: appBar,
+      bottomNavigationBar: bottomNavigationBar,
       body: Column(
         children: [
-          // The connectivity/sync status bar remains at the top.
+          // This consistent sync bar appears on every screen using this layout.
           const _SyncBar(),
-          // The page body is expanded to fill the remaining space.
+          // The screen's content fills the remaining space.
           Expanded(child: child),
         ],
       ),
@@ -39,57 +32,33 @@ class MainLayout extends StatelessWidget {
   }
 }
 
-/// A private widget for the sync bar to keep the build method clean.
+/// A private widget for displaying the sync status bar.
 class _SyncBar extends StatelessWidget {
   const _SyncBar();
 
   @override
   Widget build(BuildContext context) {
-    // Consume state from providers to drive the UI.
     final isConnected = context.watch<ConnectivityNotifier>().isOnline;
-    final syncNotifier = context.watch<SyncNotifier>();
-    final isSyncing = syncNotifier.isSyncing;
-    final pending = syncNotifier.pending;
+    final isSyncing = context.watch<SyncNotifier>().isSyncing;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      height: isConnected ? 24 : 0,
       width: double.infinity,
-      color: isSyncing
-          ? Colors.blue // syncing
-          : isConnected
-          ? Colors.green // online
-          : Colors.grey, // offline
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // Display pending changes if there are any and we are not syncing.
-          if (pending > 0 && !isSyncing) ...[
-            Text(
-              '$pending pending',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-            ),
-            const SizedBox(width: 8),
+      color: isSyncing ? Colors.blueAccent : Colors.green,
+      child: isConnected
+          ? Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Icon(isSyncing ? Icons.sync : Icons.cloud_done, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(isSyncing ? "Syncing..." : "Online", style: const TextStyle(color: Colors.white, fontSize: 12)),
           ],
-          Icon(
-            isSyncing
-                ? Icons.sync
-                : isConnected
-                ? Icons.wifi
-                : Icons.wifi_off,
-            size: 16,
-            color: Colors.white,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            isSyncing
-                ? "Syncing..."
-                : isConnected
-                ? "Online"
-                : "Offline",
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ],
-      ),
+        ),
+      )
+          : null,
     );
   }
 }

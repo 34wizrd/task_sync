@@ -3,17 +3,17 @@ import '../../core/models/food_item_model.dart';
 import '../../core/models/meal_entry_model.dart';
 import '../../core/network/sync_notifier.dart';
 import '../food/food_service.dart';
-import 'diary_service.dart';
+import 'dashboard_service.dart';
 
 /// Manages the state for the daily diary screen.
-class DiaryNotifier extends BaseNotifier {
-  DiaryNotifier({
-    required DiaryService diaryService,
+class DashboardNotifier extends BaseNotifier {
+  DashboardNotifier({
+    required DashboardService dashboardService,
     required SyncNotifier syncNotifier,
-  })  : _diaryService = diaryService,
+  })  : _dashboardService = dashboardService,
         _syncNotifier = syncNotifier;
 
-  final DiaryService _diaryService;
+  final DashboardService _dashboardService;
   final SyncNotifier _syncNotifier;
 
   List<MealEntry> _todaysEntries = [];
@@ -27,7 +27,7 @@ class DiaryNotifier extends BaseNotifier {
   /// Loads all of today's meal entries from the local database.
   Future<void> loadTodaysEntries() async {
     await guard(() async {
-      _todaysEntries = await _diaryService.getTodaysEntries();
+      _todaysEntries = await _dashboardService.getTodaysEntries();
     });
     // No need to update pending count here, as loading doesn't create new pending items.
   }
@@ -35,9 +35,9 @@ class DiaryNotifier extends BaseNotifier {
   /// Adds a new meal entry based on a selected food item.
   Future<void> addMealEntry(FoodItem foodItem) async {
     await guard(() async {
-      await _diaryService.addMealEntry(foodItem);
+      await _dashboardService.addMealEntry(foodItem);
       // Refresh the list from the source of truth to show the new entry.
-      _todaysEntries = await _diaryService.getTodaysEntries();
+      _todaysEntries = await _dashboardService.getTodaysEntries();
     });
     await _updatePendingCount();
   }
@@ -45,7 +45,7 @@ class DiaryNotifier extends BaseNotifier {
   /// Deletes a meal entry.
   Future<void> deleteMealEntry(String id) async {
     await guard(() async {
-      await _diaryService.deleteMealEntry(id);
+      await _dashboardService.deleteMealEntry(id);
       _todaysEntries.removeWhere((entry) => entry.id == id);
     });
     await _updatePendingCount();

@@ -8,8 +8,8 @@ import 'core/network/sync_notifier.dart';
 import 'core/services/sync_service.dart';
 // Import the services and notifiers needed for the app
 import 'features/auth/auth_gate.dart';
-import 'features/diary/diary_notifier.dart';
-import 'features/diary/diary_service.dart';
+import 'features/diary/dashboard_notifier.dart';
+import 'features/diary/dashboard_service.dart';
 import 'features/food/food_notifier.dart';
 import 'features/food/food_service.dart';
 import 'firebase_options.dart';
@@ -65,7 +65,7 @@ class MyApp extends StatelessWidget {
     // Instantiate all services at the top level so they are singletons.
     final syncService = SyncService();
     final foodService = FoodService();
-    final diaryService = DiaryService(); // Following the same repository pattern
+    final dashboardService = DashboardService(); // Following the same repository pattern
 
     return MultiProvider(
       providers: [
@@ -84,8 +84,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (context) => DiaryNotifier(
-            diaryService: diaryService,
+          create: (context) => DashboardNotifier(
+            dashboardService: dashboardService,
             // Also depends on SyncNotifier to update pending counts.
             syncNotifier: context.read<SyncNotifier>(),
           ),
@@ -106,8 +106,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// A helper widget that listens for connectivity changes and triggers a sync.
-/// This decouples the sync logic from the UI screens.
 class _SyncTrigger extends StatefulWidget {
   final Widget child;
   const _SyncTrigger({required this.child});
@@ -116,50 +114,26 @@ class _SyncTrigger extends StatefulWidget {
   State<_SyncTrigger> createState() => _SyncTriggerState();
 }
 
-// In main.dart
-
 class _SyncTriggerState extends State<_SyncTrigger> {
-  // Store the previous connection state to detect when we come back online.
-  bool wasOffline = false;
-
-  // ADDED: A flag to ensure the initial check only runs once.
+  bool wasOffline = true; // Start as true to trigger initial sync
   bool _initialCheckPerformed = false;
 
   @override
   Widget build(BuildContext context) {
-    // Watch the ConnectivityNotifier for changes.
-    final connectivity = context.watch<ConnectivityNotifier>();
-    final isOnline = connectivity.isOnline;
-
-    // --- NEW LOGIC: ONE-TIME STARTUP SYNC ---
-    // After the first build, if we are online, perform an initial sync.
-    if (!_initialCheckPerformed && isOnline) {
-      _initialCheckPerformed = true; // Mark as performed
-      print("App started online. Triggering initial sync check.");
-      // Use a post-frame callback to safely call the notifier after the build.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.read<SyncNotifier>().sync();
-        }
-      });
+    final isOnline = context.watch<ConnectivityNotifier>().isOnline;
+    if (!_initialCheckPerformed) {
+      wasOffline = !isOnline;
+      _initialCheckPerformed = true;
     }
-    // --- END NEW LOGIC ---
 
-    // --- EXISTING LOGIC: RECONNECTION SYNC ---
-    // If the device was offline and is now online, trigger a sync.
     if (wasOffline && isOnline) {
-      print("Connection restored. Triggering automatic sync...");
-      // A post-frame callback is safer here too.
+      print("Connection restored or app started online. Triggering sync...");
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.read<SyncNotifier>().sync();
-        }
+        if (mounted) context.read<SyncNotifier>().sync();
       });
     }
 
-    // Update the previous state for the next build cycle.
     wasOffline = !isOnline;
-
     return widget.child;
   }
 }

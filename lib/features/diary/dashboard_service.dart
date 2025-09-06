@@ -8,7 +8,7 @@ import '../../core/services/db_service.dart';
 
 /// A service class that encapsulates all database operations for meal entries.
 /// This acts as the repository for the diary feature.
-class DiaryService {
+class DashboardService {
   final DbService _dbService = DbService.instance;
   final Uuid _uuid = const Uuid();
 

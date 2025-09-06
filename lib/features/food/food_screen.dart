@@ -25,15 +25,7 @@ class _FoodScreenState extends State<FoodScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MainLayout(
-      title: 'Food Library',
-      fab: FloatingActionButton(
-        tooltip: 'Add Food',
-        onPressed: () => _showAddFoodSheet(context),
-        child: const Icon(Icons.add),
-      ),
-      child: const _FoodScreenBody(),
-    );
+    return const _FoodScreenBody();
   }
 
   void _showAddFoodSheet(BuildContext context) {
