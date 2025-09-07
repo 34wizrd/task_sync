@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:task_sync/core/services/auth_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  AuthService get _authService => AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +92,7 @@ class ProfileScreen extends StatelessWidget {
                       // --- LOGOUT LOGIC GOES HERE ---
                       // In a real app, you would:
                       // 1. Sign the user out from Firebase
-                      // await FirebaseAuth.instance.signOut();
+                      await _authService.signOut();
 
                       // 2. Navigate to the LoginScreen and remove all previous
                       // screens from the navigation stack.

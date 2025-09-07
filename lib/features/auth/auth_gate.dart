@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 
 // Import the AppShell, which is the main screen for authenticated users.
 import '../../widgets/app_shell.dart';
-// Import the LoginScreen for users who are not logged in.
-import 'login/login_screen.dart';
+// --- UPDATED: Import the new WelcomeScreen ---
+import '../welcome/welcome_screen.dart';
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -27,14 +27,15 @@ class AuthGate extends StatelessWidget {
 
         // --- If the user is logged in (snapshot has user data) ---
         if (snapshot.hasData) {
-          // CORRECT: Show the AppShell.
-          // The AppShell provides the full UI with the BottomNavigationBar,
-          // and it displays the DashboardScreen as the first tab by default.
+          // The logic for a logged-in user remains the same: show the main app.
           return const AppShell();
         }
 
         // --- If the user is NOT logged in (snapshot has no data) ---
-        return const LoginScreen();
+        // UPDATED: Show the WelcomeScreen as the entry point for new or
+        // logged-out users. The WelcomeScreen will then handle navigation
+        // to the Login or Sign Up pages.
+        return const WelcomeScreen();
       },
     );
   }
